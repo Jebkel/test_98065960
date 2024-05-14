@@ -3,9 +3,139 @@
 namespace App\Services;
 
 use App\Contracts\HhApiInterface;
+use Http;
 
 class HhApi implements HhApiInterface
 {
+
+    public static function transliterate($textcyr): array|string
+    {
+        $cyr = array(
+            'ж',
+            'ч',
+            'щ',
+            'ш',
+            'ю',
+            'а',
+            'б',
+            'в',
+            'г',
+            'д',
+            'е',
+            'з',
+            'и',
+            'й',
+            'к',
+            'л',
+            'м',
+            'н',
+            'о',
+            'п',
+            'р',
+            'с',
+            'т',
+            'у',
+            'ф',
+            'х',
+            'ц',
+            'ъ',
+            'ь',
+            'я',
+            'Ж',
+            'Ч',
+            'Щ',
+            'Ш',
+            'Ю',
+            'А',
+            'Б',
+            'В',
+            'Г',
+            'Д',
+            'Е',
+            'З',
+            'И',
+            'Й',
+            'К',
+            'Л',
+            'М',
+            'Н',
+            'О',
+            'П',
+            'Р',
+            'С',
+            'Т',
+            'У',
+            'Ф',
+            'Х',
+            'Ц',
+            'Ъ',
+            'Ь',
+            'Я'
+        );
+        $lat = array(
+            'zh',
+            'ch',
+            'sht',
+            'sh',
+            'yu',
+            'a',
+            'b',
+            'v',
+            'g',
+            'd',
+            'e',
+            'z',
+            'i',
+            'j',
+            'k',
+            'l',
+            'm',
+            'n',
+            'o',
+            'p',
+            'r',
+            's',
+            't',
+            'u',
+            'f',
+            'h',
+            'c',
+            'y',
+            'x',
+            'q',
+            'Zh',
+            'Ch',
+            'Sht',
+            'Sh',
+            'Yu',
+            'A',
+            'B',
+            'V',
+            'G',
+            'D',
+            'E',
+            'Z',
+            'I',
+            'J',
+            'K',
+            'L',
+            'M',
+            'N',
+            'O',
+            'P',
+            'R',
+            'S',
+            'T',
+            'U',
+            'F',
+            'H',
+            'c',
+            'Y',
+            'X',
+            'Q'
+        );
+        return str_replace($cyr, $lat, $textcyr);
+    }
 
     /**
      * Recursively extracts names and IDs from the given data array.
@@ -13,14 +143,14 @@ class HhApi implements HhApiInterface
      * @param array $data The data array containing areas.
      * @return array The extracted names and IDs.
      */
-    private function extractNamesAndIDs(array $data): array
+    private static function extractNamesAndIDs(array $data): array
     {
         $result = [];
         foreach ($data as $item) {
             if (empty($item['areas'])) {
                 $result[$item['id']] = $item['name'];
             } else {
-                $result += $this->extractNamesAndIDs($item['areas']);
+                $result += self::extractNamesAndIDs($item['areas']);
             }
         }
         return $result;
@@ -33,14 +163,18 @@ class HhApi implements HhApiInterface
      * @param array $existing_keys Array containing existing keys.
      * @return string The generated unique key.
      */
-    private function generateUniqKey(string $key, array $existing_keys) : string {
+    private static function generateUniqKey(string $key, array $existing_keys): string
+    {
         if (str_contains($key, ' ')) {
             $key = explode(' ', $key)[0];
+        } else {
+            return self::transliterate($key);
         }
-        while (in_array($key, $existing_keys, true)) {
-            $key .= '1';
+        $counter = 1;
+        while (in_array($key . $counter, $existing_keys, true)) {
+            $counter++;
         }
-        return $key;
+        return self::transliterate($key) . $counter;
     }
 
     /**
@@ -49,13 +183,13 @@ class HhApi implements HhApiInterface
      * @param string $language The language code for localization.
      * @return array The array of country names indexed by their IDs.
      */
-    private function getNames(string $language): array
+    private static function getNames(string $language): array
     {
-        $response = \Http::get('https://api.hh.ru/areas?locale=' . $language);
+        $response = Http::withoutVerifying()->get('https://api.hh.ru/areas?locale=' . $language);
         # Не делал обработку ошибки API
 
         # P.s указываю россию так, ибо она сразу первая идёт, но лучше брать по ID
-        return $this->extractNamesAndIDs($response->json()[0]['areas']);
+        return self::extractNamesAndIDs($response->json()[0]['areas']);
     }
 
     /**
@@ -63,21 +197,17 @@ class HhApi implements HhApiInterface
      *
      * @return array The array of country names indexed by unique keys.
      */
-    public function getCountries(): array
+    public static function getCountries(): array
     {
-        $ru_areas = $this->getNames('RU');
-        $en_areas = $this->getNames("EN");
+        $ru_areas = self::getNames('RU');
+        $en_areas = self::getNames("EN");
 
         $result = [];
-        $existing_keys = [];
 
         foreach ($ru_areas as $ru_key => $ru_value) {
-            $en_key = $en_areas[$ru_key] ?? null;
-            if ($en_key) {
-                $en_key = $this->generateUniqKey($en_key, $existing_keys);
-                $existing_keys[] = $en_key;
-                $result[$en_key] = $ru_value;
-            }
+            $en_key = $en_areas[$ru_key];
+            $uniq_en_key = self::generateUniqKey($en_key, $result);
+            $result[$uniq_en_key] = $ru_value;
         }
 
         return $result;

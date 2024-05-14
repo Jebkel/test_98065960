@@ -10,7 +10,7 @@ return new class extends Migration {
         Schema::create('areas', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('alt_name');
+            $table->string('alt_name')->unique();
         });
     }
 

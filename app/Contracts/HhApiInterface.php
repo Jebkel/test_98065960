@@ -3,5 +3,5 @@ namespace App\Contracts;
 
 interface HhApiInterface
 {
-    public function getCountries(): array;
+    public static function getCountries(): array;
 }
