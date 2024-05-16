@@ -36,7 +36,7 @@ class CityMiddleware
         $user_city = Cache::remember('city_' . $user_city, 60 * 60, static function ()
         use ($user_city): Area {
             $result = Area::where('alt_name', $user_city)->first();
-            if ($result->exists()) {
+            if (!is_null($result) && $result->exists()) {
                 return $result;
             }
             return Area::where('alt_name', 'moscow')->first();
