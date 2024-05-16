@@ -168,13 +168,13 @@ class HhApi implements HhApiInterface
         if (str_contains($key, ' ')) {
             $key = explode(' ', $key)[0];
         } else {
-            return self::transliterate($key);
+            return strtolower(self::transliterate($key));
         }
         $counter = 1;
         while (in_array($key . $counter, $existing_keys, true)) {
             $counter++;
         }
-        return self::transliterate($key) . $counter;
+        return strtolower(self::transliterate($key)) . $counter;
     }
 
     /**
